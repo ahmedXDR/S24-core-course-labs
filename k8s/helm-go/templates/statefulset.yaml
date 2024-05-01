@@ -1,16 +1,17 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: {{ include "helm-python.fullname" . }}
+  name: {{ include "helm-go.fullname" . }}
   labels:
-    {{- include "helm-python.labels" . | nindent 4 }}
+    {{- include "helm-go.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: {{ .Values.podManagementPolicy }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "helm-python.selectorLabels" . | nindent 6 }}
+      {{- include "helm-go.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,7 +19,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "helm-python.labels" . | nindent 8 }}
+        {{- include "helm-go.labels" . | nindent 8 }}
 	{{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -27,7 +28,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "helm-python.serviceAccountName" . }}
+      serviceAccountName: {{ include "helm-go.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -36,13 +37,6 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            {{ include "helm-python.pythonEnvs" . | nindent 12 }}
-            - name: k1
-              valueFrom:
-                configMapKeyRef:
-                  name: config-entity
-                  key: k1
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
@@ -55,21 +49,18 @@ spec:
           #   httpGet:
           #     path: /
           #     port: http
+          env:
+            {{ include "app-golang.goEnvs" . | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.volumeMounts }}
           volumeMounts:
-            - name: config-volume-py
-              mountPath: "/config.json"
-              subPath: config.json
-            - name: counter-data-py
-              mountPath: /data
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
       volumes:
-        - name: config-volume-py
-          configMap:
-            name: config-entity
-        - name: counter-data-py
-          emptyDir:
-            sizeLimit: 500Mi
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -82,3 +73,5 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  volumeClaimTemplates:
+  {{- toYaml .Values.volumeClaimTemplates | nindent 2 }}
